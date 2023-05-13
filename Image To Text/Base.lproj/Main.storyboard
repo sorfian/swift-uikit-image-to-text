@@ -96,7 +96,11 @@
                         </connections>
                     </tableView>
                     <navigationItem key="navigationItem" title="Image To Text" id="PwK-BY-nfh">
-                        <barButtonItem key="rightBarButtonItem" title="Save" id="zP6-15-CP5"/>
+                        <barButtonItem key="rightBarButtonItem" title="Save To" id="zP6-15-CP5">
+                            <connections>
+                                <action selector="saveToButtonWithSender:" destination="kBo-7S-cFc" id="bWY-ke-sAS"/>
+                            </connections>
+                        </barButtonItem>
                     </navigationItem>
                 </tableViewController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="MiY-xC-2ZY" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>

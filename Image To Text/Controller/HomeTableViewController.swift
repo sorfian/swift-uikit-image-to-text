@@ -28,7 +28,9 @@ class HomeTableViewController: UITableViewController {
     
     lazy var dataSource = configureDataSource()
     
-    let button = UIButton(frame: CGRect(x: 150, y: 550, width: 75, height: 75))
+    let button = UIButton()
+    
+    var databaseStorage: Bool = false
     
     private var ocrRequest = VNRecognizeTextRequest(completionHandler: nil)
 
@@ -48,7 +50,8 @@ class HomeTableViewController: UITableViewController {
         NSLayoutConstraint.activate([
             button.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -16),
             button.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -16),
-            button.widthAnchor.constraint(greaterThanOrEqualToConstant: 100)
+            button.widthAnchor.constraint(greaterThanOrEqualToConstant: 100),
+            button.heightAnchor.constraint(equalToConstant: 40)
         ])
         
         button.addTarget(self, action: #selector(scanDocument), for: .touchUpInside)
@@ -129,6 +132,32 @@ class HomeTableViewController: UITableViewController {
     
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
+    }
+    
+    @IBAction func saveToButton(sender: UIStoryboard) {
+        let storageSourceRequestController = UIAlertController(title: "", message: "Choose your storage source", preferredStyle: .actionSheet)
+        
+        let fileStorageAction = UIAlertAction(title: "Encrypted File", style: .default) { action in
+            self.databaseStorage = false
+        }
+        
+        let databaseStorageAction = UIAlertAction(title: "Database Storage", style: .default) { action in
+            self.databaseStorage = true
+        }
+        
+        let cancelAction = UIAlertAction(title: NSLocalizedString("Cancel", comment: "Cancel"), style: .cancel)
+        
+        storageSourceRequestController.addAction(fileStorageAction)
+        storageSourceRequestController.addAction(databaseStorageAction)
+        storageSourceRequestController.addAction(cancelAction)
+        
+//            For Ipad
+        if let popoverPresentationController = storageSourceRequestController.popoverPresentationController {
+            popoverPresentationController.sourceView = view
+            popoverPresentationController.sourceRect = view.bounds
+        }
+        
+        present(storageSourceRequestController, animated: true, completion: nil)
     }
 }
 
