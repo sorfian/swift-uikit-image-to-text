@@ -8,6 +8,8 @@
 import UIKit
 import Vision
 import VisionKit
+import CoreData
+import PhotosUI
 
 class HomeTableViewController: UITableViewController {
     
@@ -15,16 +17,10 @@ class HomeTableViewController: UITableViewController {
         case all
     }
     
-    var textResult: [DataText] = [
-        DataText(input: "1+2", result: "3"),
-        DataText(input: "2+2", result: "4"),
-        DataText(input: "3+3", result: "6"),
-        DataText(input: "3+4", result: "7"),
-        DataText(input: "3+2", result: "5"),
-        DataText(input: "3+6", result: "9"),
-        DataText(input: "3+5", result: "8"),
-        DataText(input: "3+7", result: "10"),
-    ]
+    var dataText: [DataTextResult] = []
+    var dataTextResult: DataTextResult!
+    
+    var fetchResultController: NSFetchedResultsController<DataTextResult>!
     
     lazy var dataSource = configureDataSource()
     
@@ -33,12 +29,14 @@ class HomeTableViewController: UITableViewController {
     var databaseStorage: Bool = false
     
     private var ocrRequest = VNRecognizeTextRequest(completionHandler: nil)
+    
+    let dateFormatter = DateFormatter()
 
     override func viewDidLoad() {
         super.viewDidLoad()
         
         tableView.rowHeight = UITableView.automaticDimension
-        updateSnapshot()
+        fetchDataTextResult()
         tableView.dataSource = dataSource
         
         button.backgroundColor = .systemBlue
@@ -61,9 +59,16 @@ class HomeTableViewController: UITableViewController {
     }
     
     @objc private func scanDocument() {
-        let scanVC = VNDocumentCameraViewController()
-        scanVC.delegate = self
-        present(scanVC, animated: true)
+//        let scanVC = VNDocumentCameraViewController()
+//        scanVC.delegate = self
+//        present(scanVC, animated: true)
+        
+        var config = PHPickerConfiguration(photoLibrary: .shared())
+        config.selectionLimit = 3
+        config.filter = PHPickerFilter.any(of: [.images, .livePhotos, .panoramas, .screenshots])
+        let vc = PHPickerViewController(configuration: config)
+        vc.delegate = self
+        self.present(vc, animated: true, completion: nil)
     }
     
     private func processImage(_ image: UIImage) {
@@ -80,14 +85,61 @@ class HomeTableViewController: UITableViewController {
     }
     
     private func configureOCR() {
-        ocrRequest = VNRecognizeTextRequest { (request, error) in
+        
+        ocrRequest = VNRecognizeTextRequest { [self] (request, error) in
             guard let observations = request.results as? [VNRecognizedTextObservation] else { return }
             
-            var ocrText = ""
-            for observation in observations {
-                guard let topCandidate = observation.topCandidates(1).first else { return }
+            let topCandidate = observations[0].topCandidates(1).first!
+            let ocrText = topCandidate.string
+            
+            print("HASIL ==> \(ocrText)")
+            
+            var expressionList: [String] = []
+            let numList = ocrText.components(separatedBy: ["\u{00D7}", "x", "X", ":", "+", "-"])
+            
+            let _ = ocrText.map { char in
                 
-                ocrText += topCandidate.string + "\n"
+                if (char != " ") {
+                    if char.description == "\u{00D7}" {
+                        expressionList.append("*")
+                    } else if char.description == ":" {
+                        expressionList.append("/")
+                    } else if char.description == "+" {
+                        expressionList.append("+")
+                    } else if char.description == "-" {
+                        expressionList.append("-")
+                    }
+                }
+                
+            }
+            print(numList)
+            print(expressionList)
+            
+            let firstArgument = numList[0]
+            let secondArgument = numList[1]
+            let expression = expressionList[0]
+            
+            let finalText = firstArgument + expression + secondArgument
+            
+            print(finalText)
+            var finalResult = 0
+            
+            let expressionResult = NSExpression(format: finalText)
+            if let result = expressionResult.expressionValue(with: nil, context: nil) as? Int {
+                print(result)
+                finalResult = result
+            }
+            
+            
+            if let appDelegate = (UIApplication.shared.delegate as? AppDelegate) {
+                dataTextResult = DataTextResult(context: appDelegate.persistentContainer.viewContext)
+
+                dataTextResult.input = ocrText
+                dataTextResult.result = finalResult
+                dataTextResult.dateTime = Date()
+
+                print("Saving data to context...")
+                appDelegate.saveContext()
             }
             
             
@@ -102,16 +154,18 @@ class HomeTableViewController: UITableViewController {
     }
     
     
-    private func configureDataSource() -> UITableViewDiffableDataSource<Section, DataText> {
+    private func configureDataSource() -> UITableViewDiffableDataSource<Section, DataTextResult> {
         let cellIdentifier = "resultCell"
 
-        let dataSource = UITableViewDiffableDataSource<Section, DataText>(
+        let dataSource = UITableViewDiffableDataSource<Section, DataTextResult>(
             tableView: tableView,
             cellProvider: {  tableView, indexPath, textData in
                 let cell = tableView.dequeueReusableCell(withIdentifier: cellIdentifier, for: indexPath) as! HomeTableViewCell
-
+                let dateTime = self.dateFormatter.string(from: Date())
                 cell.inputValueLabel.text = textData.input
-                cell.resultValueLabel.text = textData.result
+                cell.resultValueLabel.text = String(textData.result)
+                cell.dateTimeLabel.text = String(describing: textData.dateTime)
+                print("HASIL ==> \(dateTime)")
 
                 return cell
             }
@@ -120,15 +174,7 @@ class HomeTableViewController: UITableViewController {
         return dataSource
     }
     
-    private func updateSnapshot(animatingChange: Bool = false) {
-
-        // Create a snapshot and populate the data
-        var snapshot = NSDiffableDataSourceSnapshot<Section, DataText>()
-        snapshot.appendSections([.all])
-        snapshot.appendItems(textResult, toSection: .all)
-
-        dataSource.apply(snapshot, animatingDifferences: animatingChange)
-    }
+    
     
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
@@ -178,5 +224,63 @@ extension HomeTableViewController: VNDocumentCameraViewControllerDelegate {
     
     func documentCameraViewControllerDidCancel(_ controller: VNDocumentCameraViewController) {
         controller.dismiss(animated: true)
+    }
+}
+
+extension HomeTableViewController: NSFetchedResultsControllerDelegate {
+    func fetchDataTextResult() {
+//        Fetch data from data store
+        let fetchRequest: NSFetchRequest<DataTextResult> = DataTextResult.fetchRequest()
+        
+        let sortDescriptor = NSSortDescriptor(key: "dateTime", ascending: true)
+        fetchRequest.sortDescriptors = [sortDescriptor]
+        
+        if let appDelegate = (UIApplication.shared.delegate as? AppDelegate) {
+            let context = appDelegate.persistentContainer.viewContext
+            fetchResultController = NSFetchedResultsController(fetchRequest: fetchRequest, managedObjectContext: context, sectionNameKeyPath: nil, cacheName: nil)
+            fetchResultController.delegate = self
+            
+            do {
+                try fetchResultController.performFetch()
+                updateSnapshot()
+            } catch {
+                print(error)
+            }
+        }
+    }
+    
+    func updateSnapshot(animatingChange: Bool = false) {
+        if let fetchedObjects = fetchResultController.fetchedObjects {
+            dataText = fetchedObjects
+        }
+
+        // Create a snapshot and populate the data
+        var snapshot = NSDiffableDataSourceSnapshot<Section, DataTextResult>()
+        snapshot.appendSections([.all])
+        snapshot.appendItems(dataText, toSection: .all)
+
+        dataSource.apply(snapshot, animatingDifferences: animatingChange)
+    }
+}
+
+extension HomeTableViewController: PHPickerViewControllerDelegate {
+    func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
+        results.forEach { result in
+            
+            if result.itemProvider.canLoadObject(ofClass: UIImage.self) {
+                result.itemProvider.loadObject(ofClass: UIImage.self) { reading, error in
+                    DispatchQueue.main.async {
+                        guard let image = reading as? UIImage, error == nil
+                        else {
+                            return
+                        }
+                        
+                        self.processImage(image)
+                    }
+                }
+            }
+            
+            picker.dismiss(animated: true, completion: nil)
+        }
     }
 }

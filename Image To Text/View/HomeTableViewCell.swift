@@ -19,7 +19,6 @@ class HomeTableViewCell: UITableViewCell {
     @IBOutlet weak var inputValueLabel:UILabel! {
         didSet {
             inputValueLabel.numberOfLines = 0
-            inputValueLabel.text = "1+2"
         }
     }
     
@@ -33,7 +32,12 @@ class HomeTableViewCell: UITableViewCell {
     @IBOutlet weak var resultValueLabel:UILabel! {
         didSet {
             resultValueLabel.numberOfLines = 0
-            resultValueLabel.text = "3"
+        }
+    }
+    
+    @IBOutlet weak var dateTimeLabel:UILabel! {
+        didSet {
+            dateTimeLabel.numberOfLines = 0
         }
     }
 

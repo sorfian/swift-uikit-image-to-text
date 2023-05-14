@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		D61AA2772A0F217100AB50CA /* DataText.swift in Sources */ = {isa = PBXBuildFile; fileRef = D61AA2762A0F217100AB50CA /* DataText.swift */; };
+		D61AA2772A0F217100AB50CA /* DataTextResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = D61AA2762A0F217100AB50CA /* DataTextResult.swift */; };
 		D6A6BCCA2A0E5AD200E3CBF3 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6A6BCC92A0E5AD200E3CBF3 /* AppDelegate.swift */; };
 		D6A6BCCC2A0E5AD200E3CBF3 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6A6BCCB2A0E5AD200E3CBF3 /* SceneDelegate.swift */; };
 		D6A6BCD12A0E5AD200E3CBF3 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = D6A6BCCF2A0E5AD200E3CBF3 /* Main.storyboard */; };
@@ -19,7 +19,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		D61AA2762A0F217100AB50CA /* DataText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataText.swift; sourceTree = "<group>"; };
+		D61AA2762A0F217100AB50CA /* DataTextResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataTextResult.swift; sourceTree = "<group>"; };
 		D6A6BCC62A0E5AD200E3CBF3 /* Image To Text.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Image To Text.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		D6A6BCC92A0E5AD200E3CBF3 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		D6A6BCCB2A0E5AD200E3CBF3 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
@@ -62,7 +62,7 @@
 		D61AA2782A0F217800AB50CA /* Model */ = {
 			isa = PBXGroup;
 			children = (
-				D61AA2762A0F217100AB50CA /* DataText.swift */,
+				D61AA2762A0F217100AB50CA /* DataTextResult.swift */,
 			);
 			path = Model;
 			sourceTree = "<group>";
@@ -173,7 +173,7 @@
 			files = (
 				D6A6BCE12A0E61ED00E3CBF3 /* HomeTableViewController.swift in Sources */,
 				D6A6BCE32A0E620E00E3CBF3 /* HomeTableViewCell.swift in Sources */,
-				D61AA2772A0F217100AB50CA /* DataText.swift in Sources */,
+				D61AA2772A0F217100AB50CA /* DataTextResult.swift in Sources */,
 				D6A6BCCA2A0E5AD200E3CBF3 /* AppDelegate.swift in Sources */,
 				D6A6BCCC2A0E5AD200E3CBF3 /* SceneDelegate.swift in Sources */,
 				D6A6BCD42A0E5AD200E3CBF3 /* Image_To_Text.xcdatamodeld in Sources */,
