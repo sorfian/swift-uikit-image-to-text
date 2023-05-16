@@ -8,6 +8,10 @@
 import Foundation
 import CoreData
 
+enum Section {
+    case all
+}
+
 public class DataTextResult: NSManagedObject {
     @nonobjc public class func fetchRequest() -> NSFetchRequest<DataTextResult> {
         return NSFetchRequest<DataTextResult>(entityName: "DataTextResult")

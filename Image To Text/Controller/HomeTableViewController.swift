@@ -13,13 +13,6 @@ import PhotosUI
 
 class HomeTableViewController: UITableViewController {
     
-    enum Section {
-        case all
-    }
-    
-    var dataText: [DataTextResult] = []
-    var dataTextResult: DataTextResult!
-    
     var fetchResultController: NSFetchedResultsController<DataTextResult>!
     
     lazy var dataSource = configureDataSource()
@@ -31,12 +24,20 @@ class HomeTableViewController: UITableViewController {
     private var ocrRequest = VNRecognizeTextRequest(completionHandler: nil)
     
     let dateFormatter = DateFormatter()
+    
+    var fileURL: URL?
+    
+    let dataStorage: DataStorage = DataStorage()
 
     override func viewDidLoad() {
         super.viewDidLoad()
         
         tableView.rowHeight = UITableView.automaticDimension
-        fetchDataTextResult()
+        
+        let documentsUrl = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
+        fileURL = documentsUrl?.appending(path: "filedatatext.txt")
+        
+        fetchDataTextFromFile()
         tableView.dataSource = dataSource
         
         button.backgroundColor = .systemBlue
@@ -55,6 +56,7 @@ class HomeTableViewController: UITableViewController {
         button.addTarget(self, action: #selector(scanDocument), for: .touchUpInside)
         
         configureOCR()
+        print(databaseStorage)
 
     }
     
@@ -131,20 +133,54 @@ class HomeTableViewController: UITableViewController {
             }
             
             
-            if let appDelegate = (UIApplication.shared.delegate as? AppDelegate) {
-                dataTextResult = DataTextResult(context: appDelegate.persistentContainer.viewContext)
+            if databaseStorage {
+                if let appDelegate = (UIApplication.shared.delegate as? AppDelegate) {
+                    let dataTextResult = DataTextResult(context: appDelegate.persistentContainer.viewContext)
 
-                dataTextResult.input = ocrText
-                dataTextResult.result = finalResult
-                dataTextResult.dateTime = Date()
+                    dataTextResult.input = finalText
+                    dataTextResult.result = finalResult
+                    dataTextResult.dateTime = Date()
 
-                print("Saving data to context...")
-                appDelegate.saveContext()
-            }
-            
-            
-            DispatchQueue.main.async {
-                self.button.isEnabled = true
+                    print("Saving data to context...")
+                    appDelegate.saveContext()
+                }
+                
+                DispatchQueue.main.async {
+                    self.button.isEnabled = true
+                    self.fetchDataTextFromDB()
+                }
+                
+            } else {
+    //            Save to encrypted file
+                let saveToFile = "\(finalText);\(finalResult);\(Date())\n"
+                
+                EncryptedArchive.file(decrypt: true)
+                
+                print(fileURL!)
+                
+                if let filePath = fileURL {
+                   
+                    do {
+                        if var stringFromFile = try? String(contentsOf: filePath, encoding: .utf8) {
+                            stringFromFile.write(saveToFile)
+                            try stringFromFile.write(to: filePath, atomically: true, encoding: .utf8)
+                            
+                        } else {
+                           try saveToFile.write(to: filePath, atomically: true, encoding: .utf8)
+                        }
+                        
+                    } catch {
+                        print(error.localizedDescription)
+                    }
+                    
+                    EncryptedArchive.file(encrypt: true)
+                    try? FileManager.default.removeItem(at: filePath)
+                    
+                }
+                DispatchQueue.main.async {
+                    self.button.isEnabled = true
+                    self.fetchDataTextFromFile()
+                }
             }
         }
         
@@ -185,10 +221,20 @@ class HomeTableViewController: UITableViewController {
         
         let fileStorageAction = UIAlertAction(title: "Encrypted File", style: .default) { action in
             self.databaseStorage = false
+            let snapshotFile = self.dataStorage.fetchDataTextFromEncryptedFile(url: self.fileURL)
+            
+            if let snapshotFile = snapshotFile {
+                self.dataSource.apply(snapshotFile, animatingDifferences: false)
+            }
         }
         
         let databaseStorageAction = UIAlertAction(title: "Database Storage", style: .default) { action in
             self.databaseStorage = true
+            let snapshotDB = self.dataStorage.fetchDataTextFromDBStorage(delegate: HomeTableViewController())
+            
+            if let snapshotDB = snapshotDB {
+                self.dataSource.apply(snapshotDB, animatingDifferences: false)
+            }
         }
         
         let cancelAction = UIAlertAction(title: NSLocalizedString("Cancel", comment: "Cancel"), style: .cancel)
@@ -204,6 +250,7 @@ class HomeTableViewController: UITableViewController {
         }
         
         present(storageSourceRequestController, animated: true, completion: nil)
+        print(databaseStorage)
     }
 }
 
@@ -227,39 +274,23 @@ extension HomeTableViewController: VNDocumentCameraViewControllerDelegate {
     }
 }
 
+
 extension HomeTableViewController: NSFetchedResultsControllerDelegate {
-    func fetchDataTextResult() {
-//        Fetch data from data store
-        let fetchRequest: NSFetchRequest<DataTextResult> = DataTextResult.fetchRequest()
+    
+    func fetchDataTextFromFile() {
+        let snapshotFile = DataStorage().fetchDataTextFromEncryptedFile(url: fileURL)
         
-        let sortDescriptor = NSSortDescriptor(key: "dateTime", ascending: true)
-        fetchRequest.sortDescriptors = [sortDescriptor]
-        
-        if let appDelegate = (UIApplication.shared.delegate as? AppDelegate) {
-            let context = appDelegate.persistentContainer.viewContext
-            fetchResultController = NSFetchedResultsController(fetchRequest: fetchRequest, managedObjectContext: context, sectionNameKeyPath: nil, cacheName: nil)
-            fetchResultController.delegate = self
-            
-            do {
-                try fetchResultController.performFetch()
-                updateSnapshot()
-            } catch {
-                print(error)
-            }
+        if let snapshotFile = snapshotFile {
+            dataSource.apply(snapshotFile, animatingDifferences: false)
         }
     }
     
-    func updateSnapshot(animatingChange: Bool = false) {
-        if let fetchedObjects = fetchResultController.fetchedObjects {
-            dataText = fetchedObjects
+    func fetchDataTextFromDB() {
+        let snapshotDB = DataStorage().fetchDataTextFromDBStorage(delegate: HomeTableViewController())
+        
+        if let snapshotDB = snapshotDB {
+            dataSource.apply(snapshotDB, animatingDifferences: false)
         }
-
-        // Create a snapshot and populate the data
-        var snapshot = NSDiffableDataSourceSnapshot<Section, DataTextResult>()
-        snapshot.appendSections([.all])
-        snapshot.appendItems(dataText, toSection: .all)
-
-        dataSource.apply(snapshot, animatingDifferences: animatingChange)
     }
 }
 
@@ -276,11 +307,11 @@ extension HomeTableViewController: PHPickerViewControllerDelegate {
                         }
                         
                         self.processImage(image)
+                        picker.dismiss(animated: true, completion: nil)
                     }
                 }
             }
-            
-            picker.dismiss(animated: true, completion: nil)
         }
     }
+    
 }
