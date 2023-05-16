@@ -40,7 +40,7 @@ class HomeTableViewController: UITableViewController {
         fetchDataTextFromFile()
         tableView.dataSource = dataSource
         
-        button.backgroundColor = .systemBlue
+        button.backgroundColor = Config.theme()
         button.setTitle("Add Input", for: .normal)
         button.layer.cornerRadius = 5
         self.view.addSubview(button)
@@ -56,21 +56,26 @@ class HomeTableViewController: UITableViewController {
         button.addTarget(self, action: #selector(scanDocument), for: .touchUpInside)
         
         configureOCR()
-        print(databaseStorage)
 
     }
     
     @objc private func scanDocument() {
-//        let scanVC = VNDocumentCameraViewController()
-//        scanVC.delegate = self
-//        present(scanVC, animated: true)
         
-        var config = PHPickerConfiguration(photoLibrary: .shared())
-        config.selectionLimit = 3
-        config.filter = PHPickerFilter.any(of: [.images, .livePhotos, .panoramas, .screenshots])
-        let vc = PHPickerViewController(configuration: config)
-        vc.delegate = self
-        self.present(vc, animated: true, completion: nil)
+//        Take a picture from camera if your Config camera is set to true
+//        Get the picture from camera roll if your Config camera is set to false
+        
+        if Config.camera {
+            let scanVC = VNDocumentCameraViewController()
+            scanVC.delegate = self
+            present(scanVC, animated: true)
+        } else {
+            var config = PHPickerConfiguration(photoLibrary: .shared())
+            config.selectionLimit = 1
+            config.filter = PHPickerFilter.any(of: [.images, .livePhotos, .panoramas, .screenshots])
+            let vc = PHPickerViewController(configuration: config)
+            vc.delegate = self
+            self.present(vc, animated: true, completion: nil)
+        }
     }
     
     private func processImage(_ image: UIImage) {
@@ -96,13 +101,19 @@ class HomeTableViewController: UITableViewController {
             
             print("HASIL ==> \(ocrText)")
             
-            var expressionList: [String] = []
+//            Store an arguments of number to array separated by arithmetic symbols
             let numList = ocrText.components(separatedBy: ["\u{00D7}", "x", "X", ":", "+", "-"])
             
+//            Store an arithmetic expression to array
+            var expressionList: [String] = []
             let _ = ocrText.map { char in
                 
                 if (char != " ") {
                     if char.description == "\u{00D7}" {
+                        expressionList.append("*")
+                    } else if char.description == "x" {
+                        expressionList.append("*")
+                    } else if char.description == "X" {
                         expressionList.append("*")
                     } else if char.description == ":" {
                         expressionList.append("/")
@@ -117,71 +128,110 @@ class HomeTableViewController: UITableViewController {
             print(numList)
             print(expressionList)
             
-            let firstArgument = numList[0]
-            let secondArgument = numList[1]
-            let expression = expressionList[0]
-            
-            let finalText = firstArgument + expression + secondArgument
-            
-            print(finalText)
-            var finalResult = 0
-            
-            let expressionResult = NSExpression(format: finalText)
-            if let result = expressionResult.expressionValue(with: nil, context: nil) as? Int {
-                print(result)
-                finalResult = result
+//            Show an alert when result is a text (not a number)
+//            there is a single array of string when the result is a text
+            if numList.count < 2 {
+                self.button.isEnabled = true
+                self.dismiss(animated: true, completion: nil)
+                let alertController = UIAlertController(title: "Oops", message: "Text detection is not a number", preferredStyle: .alert)
+                let alertAction = UIAlertAction(title: "OK", style: .default, handler: nil)
+                alertController.addAction(alertAction)
+                present(alertController, animated: true, completion: nil)
+                return
             }
             
+//            There is no data when arithmetic symbols not found
+            if expressionList.isEmpty {
+                self.button.isEnabled = true
+                self.dismiss(animated: true, completion: nil)
+                let alertController = UIAlertController(title: "Oops", message: "No arithmetic expression found!", preferredStyle: .alert)
+                let alertAction = UIAlertAction(title: "OK", style: .default, handler: nil)
+                alertController.addAction(alertAction)
+                present(alertController, animated: true, completion: nil)
+                return
+            }
             
-            if databaseStorage {
-                if let appDelegate = (UIApplication.shared.delegate as? AppDelegate) {
-                    let dataTextResult = DataTextResult(context: appDelegate.persistentContainer.viewContext)
-
-                    dataTextResult.input = finalText
-                    dataTextResult.result = finalResult
-                    dataTextResult.dateTime = Date()
-
-                    print("Saving data to context...")
-                    appDelegate.saveContext()
+//            Assign the first and second argument, also arithmetic symbol to expression property
+            let firstArgument = numList[0].trimmingCharacters(in: .whitespacesAndNewlines)
+            let secondArgument = numList[1].trimmingCharacters(in: .whitespacesAndNewlines)
+            let expression = expressionList[0].trimmingCharacters(in: .whitespacesAndNewlines)
+            
+//            Show an alert when there is a arithmetic symbols found but the first and second arguments are not a number
+//            Continue the logic when there is a number in first and second arguments.
+            if (firstArgument.isNumber || secondArgument.isNumber) {
+                
+//                Convert the text result to arithmetic calculation and get the final result
+                let finalText = firstArgument + expression + secondArgument
+                var finalResult = 0
+                
+                let expressionResult = NSExpression(format: finalText)
+                if let result = expressionResult.expressionValue(with: nil, context: nil) as? Int {
+                    finalResult = result
                 }
                 
-                DispatchQueue.main.async {
-                    self.button.isEnabled = true
-                    self.fetchDataTextFromDB()
+                //                Save the data to local database when database storage is set to true
+                if databaseStorage {
+                    if let appDelegate = (UIApplication.shared.delegate as? AppDelegate) {
+                        let dataTextResult = DataTextResult(context: appDelegate.persistentContainer.viewContext)
+                        
+                        dataTextResult.input = finalText
+                        dataTextResult.result = finalResult
+                        dataTextResult.dateTime = Date()
+                        
+                        print("Saving data to context...")
+                        appDelegate.saveContext()
+                    }
+                    
+                    DispatchQueue.main.async {
+                        self.button.isEnabled = true
+                        self.fetchDataTextFromDB()
+                    }
+                    
+                } else {
+//            Save the data to encrypted file when database storage is set to false
+                    let saveToFile = "\(finalText);\(finalResult);\(Date())\n"
+                    
+                    EncryptedArchive.file(decrypt: true)
+                    
+                    print(fileURL!)
+                    
+                    if let filePath = fileURL {
+                        
+                        do {
+                            if var stringFromFile = try? String(contentsOf: filePath, encoding: .utf8) {
+                                stringFromFile.write(saveToFile)
+                                try stringFromFile.write(to: filePath, atomically: true, encoding: .utf8)
+                                
+                            } else {
+                                try saveToFile.write(to: filePath, atomically: true, encoding: .utf8)
+                            }
+                            
+                        } catch {
+                            print(error.localizedDescription)
+                        }
+                        
+                        EncryptedArchive.file(encrypt: true)
+                        try? FileManager.default.removeItem(at: filePath)
+                        
+                    }
+                    DispatchQueue.main.async {
+                        self.button.isEnabled = true
+                        self.fetchDataTextFromFile()
+                    }
                 }
                 
             } else {
-    //            Save to encrypted file
-                let saveToFile = "\(finalText);\(finalResult);\(Date())\n"
-                
-                EncryptedArchive.file(decrypt: true)
-                
-                print(fileURL!)
-                
-                if let filePath = fileURL {
-                   
-                    do {
-                        if var stringFromFile = try? String(contentsOf: filePath, encoding: .utf8) {
-                            stringFromFile.write(saveToFile)
-                            try stringFromFile.write(to: filePath, atomically: true, encoding: .utf8)
-                            
-                        } else {
-                           try saveToFile.write(to: filePath, atomically: true, encoding: .utf8)
-                        }
-                        
-                    } catch {
-                        print(error.localizedDescription)
-                    }
-                    
-                    EncryptedArchive.file(encrypt: true)
-                    try? FileManager.default.removeItem(at: filePath)
-                    
-                }
-                DispatchQueue.main.async {
-                    self.button.isEnabled = true
-                    self.fetchDataTextFromFile()
-                }
+                print("bukan number")
+                self.button.isEnabled = true
+                self.dismiss(animated: true, completion: nil)
+                let alertController = UIAlertController(title: "Oops", message: "Text detection is not a number", preferredStyle: .alert)
+                let alertAction = UIAlertAction(title: "OK", style: .default, handler: nil)
+                alertController.addAction(alertAction)
+                present(alertController, animated: true, completion: nil)
+                return
             }
+            
+            
         }
         
         ocrRequest.recognitionLevel = .accurate
@@ -197,11 +247,10 @@ class HomeTableViewController: UITableViewController {
             tableView: tableView,
             cellProvider: {  tableView, indexPath, textData in
                 let cell = tableView.dequeueReusableCell(withIdentifier: cellIdentifier, for: indexPath) as! HomeTableViewCell
-                let dateTime = self.dateFormatter.string(from: Date())
+                let date = Date()
                 cell.inputValueLabel.text = textData.input
                 cell.resultValueLabel.text = String(textData.result)
-                cell.dateTimeLabel.text = String(describing: textData.dateTime)
-                print("HASIL ==> \(dateTime)")
+                cell.dateTimeLabel.text = date.dateToString(date: textData.dateTime)
 
                 return cell
             }
@@ -219,7 +268,10 @@ class HomeTableViewController: UITableViewController {
     @IBAction func saveToButton(sender: UIStoryboard) {
         let storageSourceRequestController = UIAlertController(title: "", message: "Choose your storage source", preferredStyle: .actionSheet)
         
+        storageSourceRequestController.view.tintColor = Config.theme()
+        
         let fileStorageAction = UIAlertAction(title: "Encrypted File", style: .default) { action in
+        
             self.databaseStorage = false
             let snapshotFile = self.dataStorage.fetchDataTextFromEncryptedFile(url: self.fileURL)
             
@@ -245,12 +297,11 @@ class HomeTableViewController: UITableViewController {
         
 //            For Ipad
         if let popoverPresentationController = storageSourceRequestController.popoverPresentationController {
-            popoverPresentationController.sourceView = view
+            popoverPresentationController.sourceView = view.superview
             popoverPresentationController.sourceRect = view.bounds
         }
         
         present(storageSourceRequestController, animated: true, completion: nil)
-        print(databaseStorage)
     }
 }
 
@@ -296,6 +347,12 @@ extension HomeTableViewController: NSFetchedResultsControllerDelegate {
 
 extension HomeTableViewController: PHPickerViewControllerDelegate {
     func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
+        
+        if results.isEmpty {
+            picker.dismiss(animated: true, completion: nil)
+            return
+        }
+        
         results.forEach { result in
             
             if result.itemProvider.canLoadObject(ofClass: UIImage.self) {

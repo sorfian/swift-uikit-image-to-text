@@ -22,12 +22,3 @@ public class DataTextResult: NSManagedObject {
     @NSManaged public var dateTime: Date
 }
 
-//struct DataText: Hashable {
-//    var input: String = ""
-//    var result: String = ""
-//
-//    init(input: String, result: String) {
-//        self.input = input
-//        self.result = result
-//    }
-//}

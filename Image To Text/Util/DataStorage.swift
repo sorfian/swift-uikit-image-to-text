@@ -15,8 +15,7 @@ class DataStorage {
     private var snapshot: NSDiffableDataSourceSnapshot<Section, DataTextResult>?
     
     func fetchDataTextFromDBStorage(delegate delegateClass: NSFetchedResultsControllerDelegate) -> NSDiffableDataSourceSnapshot<Section, DataTextResult>? {
-        print("fetch dari DB")
-//        Fetch data from data store
+        
         let fetchRequest: NSFetchRequest<DataTextResult> = DataTextResult.fetchRequest()
         
         let sortDescriptor = NSSortDescriptor(key: "dateTime", ascending: false)
@@ -40,10 +39,9 @@ class DataStorage {
     }
     
     func fetchDataTextFromEncryptedFile(url fileURL: URL?) -> NSDiffableDataSourceSnapshot<Section, DataTextResult>? {
-        print("fetch dari file")
         
         EncryptedArchive.file(decrypt: true)
-//        Fetch data from file encrypted
+        
         let delimiter = ";"
         var items:[(input:String, result:Int, dateTime: String)]
         
@@ -66,11 +64,8 @@ class DataStorage {
                 dataText.removeAll()
                 
                 for item in items {
-                    let dateFormatter = DateFormatter()
-                    dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss +SSSS"
-                    let stringToDate = dateFormatter.date(from: item.dateTime)!
-                    dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-                    let dateToString = dateFormatter.string(from: stringToDate)
+                    let date = Date()
+                    let stringToDate = date.stringToDate(stringDate: item.dateTime)
                     
                     if let appDelegate = (UIApplication.shared.delegate as? AppDelegate) {
                         dataTextResult = DataTextResult(context: appDelegate.persistentContainer.viewContext)
@@ -102,7 +97,6 @@ class DataStorage {
         if fromDatabase {
             if let fetchedObjects = fetchResultController?.fetchedObjects {
                 dataText = fetchedObjects
-                print("datatext ==> \(dataText)")
             }
         }
 
